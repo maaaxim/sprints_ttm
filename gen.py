@@ -1,8 +1,6 @@
 # Цель: считать
 # 1. Количество выполненных задач.
 # 2. Количество проебанных задач + причины проебов
-
-
 # 3. Показать сколько закрыто задач
 # 4. Показать корректность оценки задач
 
@@ -36,6 +34,10 @@ PASSWORD = os.environ.get("PASSWORD")
 
 options = {"server": JIRA_SERVER}
 jira = JIRA(options, auth=(LOGIN, PASSWORD))
+
+#############################
+# Отчет с текущими задачами #
+#############################
 
 # jql of current sprint
 st = 'project = MVM AND issuetype in (Bug, Task, Sub-bug) AND labels = back ' \
@@ -121,4 +123,34 @@ data_frame = pandas.DataFrame(
     ]
 )
 
-data_frame.to_excel("output.xlsx")
+############################################
+# Отчет с закрытыми и отмененными + оценки #
+############################################
+jql_closed = 'project = MVM AND issuetype in (Bug, Task, Sub-bug) ' \
+             'AND labels = back ' \
+             'AND sprint != "Backend Tech Backlog" ' \
+             'AND sprint != "LowOps backlog" ' \
+             'AND sprint != "LowOps estimate" ' \
+             'AND sprint != "Checkout backlog" ' \
+             'AND sprint != "Checkout Estimate" ' \
+             'AND sprint != "Polka backlog" ' \
+             'AND sprint != "Polka Sprint Estimation" ' \
+             'AND sprint != "LKP backlog" ' \
+             'AND sprint != "LKP Estimate" ' \
+             'AND assignee in (nivanova, ryabukha, borovaya, loboda, sasovets, tsimbalist, vahrameev) ' \
+             'AND status in (Canceled, Closed) ' \
+             'AND (status changed to Canceled after -1w OR status changed to Closed after -1w) ' \
+             'ORDER BY updated DESC, status DESC'
+
+############################################
+# Отчет с исключенными из спринта задачами #
+############################################
+# все задачи из бэклогов взять, найти текущий среди списка спринтов по задаче
+
+writer = pandas.ExcelWriter('output.xlsx', engine='xlsxwriter')
+
+data_frame.to_excel(writer, sheet_name='В работе')
+# data_frame.to_excel(writer, sheet_name='Закрытые')
+# data_frame.to_excel(writer, sheet_name='Исключенные')
+
+writer.save()
