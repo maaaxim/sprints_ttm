@@ -1,7 +1,10 @@
+# @TODO осталось добавить соответствие оценок
+
 import pandas
 import numpy as np
 import os
 import sys
+import statistics
 from pprint import pprint
 from datetime import datetime, timezone
 from dateutil import parser
@@ -70,6 +73,10 @@ issues_all = jira.search_issues(st, expand='changelog')
 
 issues_table = []
 issues_index = []
+
+# Для подсчета медианы
+issues_ttms = []
+
 for issue in issues_all:
 
     changelog = issue.changelog
@@ -87,7 +94,7 @@ for issue in issues_all:
     start_date = ''
     team = ""
     sprint_array = []
-    for sprint_info in issue.fields.customfield_10016[:1]:
+    for sprint_info in issue.fields.customfield_10016:
 
         # Уберем квадратные скобки и лишнюю хрень
         begin, end = sprint_info.find('['), sprint_info.rfind(']')
@@ -101,13 +108,16 @@ for issue in issues_all:
             sprint_array[part_split[0]] = part_split[1]
 
         # (количество дней с момента, когда задача впервые добавлена в спринт до закрытия задачи)
-        start_date = parser.parse(sprint_array['startDate'])
-        break
+        # нас интересует первый спринт с датой начала
+        if sprint_array['startDate'] != '<null>':
+            start_date = parser.parse(sprint_array['startDate'])
+            break
 
     nowdate = datetime.now()
     gmt_now = utc_to_local(nowdate)
     if closed_date != '':
         ttm = days_between(closed_date, start_date)
+        issues_ttms.append(ttm)
     else:
         ttm = days_between(gmt_now, start_date)
 
@@ -133,6 +143,17 @@ for issue in issues_all:
 
     issues_index.append(issue.key)
     issues_table.append(issue_item)
+
+issues_index.append('Медианное значение')
+issues_table.append([
+        '',
+        'all',
+        '',
+        '',
+        statistics.median(issues_ttms),
+        '',
+        '',
+    ])
 
 # Сохраняем в файл
 data_frame = pandas.DataFrame(
