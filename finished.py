@@ -1,4 +1,4 @@
-# @TODO осталось добавить соответствие оценок
+# @TODO добавить соответствие оценок
 
 import pandas
 import numpy as np
@@ -68,11 +68,15 @@ if len(sprint_ids) > 0:
     for sprint_id in sprint_ids[1:]:
         st += ' OR sprint = ' + sprint_id
 st += ') AND labels = "back" ORDER BY status ASC'
+# st = 'key = MVM-64477'
 
 issues_all = jira.search_issues(st, expand='changelog')
 
 issues_table = []
 issues_index = []
+
+ejected_table = []
+ejected_index = []
 
 # Для подсчета медианы
 issues_ttms = []
@@ -80,6 +84,7 @@ issues_ttms = []
 for issue in issues_all:
 
     changelog = issue.changelog
+    ejected = False
 
     # Получим дату закрытия таски (дата статуса closed, последняя в истории)
     closed_date = ''
@@ -106,6 +111,11 @@ for issue in issues_all:
         for part in split_sprint_info:
             part_split = part.split("=")
             sprint_array[part_split[0]] = part_split[1]
+
+        # Если задача есть в спринте Backlog, то считаем задачу "выкинутой"
+        # Куда выкидываем: Checkout backlog / LowOps backlog / LKP backlog / Polka backlog / Backend Tech Backlog
+        if "backlog" in sprint_array['name'].lower():
+            ejected = True
 
         # (количество дней с момента, когда задача впервые добавлена в спринт до закрытия задачи)
         # нас интересует первый спринт с датой начала
@@ -139,21 +149,44 @@ for issue in issues_all:
         ttm,
         start_date_text,
         closed_date_text,
+        '',
     ]
 
-    issues_index.append(issue.key)
-    issues_table.append(issue_item)
+    if ejected is True:
+        ejected_index.append(issue.key)
+        ejected_table.append(issue_item)
+    else:
+        issues_index.append(issue.key)
+        issues_table.append(issue_item)
 
 issues_index.append('Медианное значение')
+if len(issues_ttms) > 0:
+    median = statistics.median(issues_ttms)
+else:
+    median = 0
+
 issues_table.append([
-        '',
-        'all',
-        '',
-        '',
-        statistics.median(issues_ttms),
-        '',
-        '',
-    ])
+    '',
+    'all',
+    '',
+    '',
+    median,
+    '',
+    '',
+    '',
+])
+
+ejected_index.append('Всего')
+ejected_table.append([
+    '',
+    '',
+    '',
+    '',
+    '',
+    len(ejected_table),
+    '',
+    '',
+])
 
 # Сохраняем в файл
 data_frame = pandas.DataFrame(
@@ -167,11 +200,27 @@ data_frame = pandas.DataFrame(
         'TTM',
         'Взяли',
         'Закрыли',
+        'Комментарий',
+    ]
+)
+ejected_frame = pandas.DataFrame(
+    np.array(ejected_table),
+    index=ejected_index,
+    columns=[
+        'Ссылка',
+        'Команда',  # Checkout, LKP, Polka
+        'Спринт',
+        'Статус',
+        'TTM',
+        'Взяли',
+        'Закрыли',
+        'Комментарий',
     ]
 )
 
-writer = pandas.ExcelWriter('output.xlsx', engine='xlsxwriter')
+writer = pandas.ExcelWriter('reports/output.xlsx', engine='xlsxwriter')
 
-data_frame.to_excel(writer, sheet_name='Закрытые')
+data_frame.to_excel(writer, sheet_name='Прошедший спринт')
+ejected_frame.to_excel(writer, sheet_name='Исключенные из спринта')
 
 writer.save()
