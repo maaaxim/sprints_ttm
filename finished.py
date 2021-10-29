@@ -27,6 +27,8 @@ def get_team(sprint_name):
         return "checkout"
     elif "Polka" in sprint_name:
         return "polka"
+    elif "PDP" in sprint_name:
+        return "pdp"
     elif "LKP" in sprint_name:
         return "lkp"
     elif "LowOps" in sprint_name:
@@ -68,7 +70,7 @@ if len(sprint_ids) > 0:
     for sprint_id in sprint_ids[1:]:
         st += ' OR sprint = ' + sprint_id
 st += ') AND labels = "back" ORDER BY status ASC'
-# st = 'key = MVM-64477'
+# st = 'key = MVM-68812'
 
 issues_all = jira.search_issues(st, expand='changelog')
 
@@ -119,7 +121,7 @@ for issue in issues_all:
 
         # (количество дней с момента, когда задача впервые добавлена в спринт до закрытия задачи)
         # нас интересует первый спринт с датой начала
-        if sprint_array['startDate'] != '<null>':
+        if sprint_array['startDate'] != '<null>' and sprint_array['name'] != 'Polka Sprint Estimation':
             start_date = parser.parse(sprint_array['startDate'])
             break
 
@@ -127,9 +129,13 @@ for issue in issues_all:
     gmt_now = utc_to_local(nowdate)
     if closed_date != '':
         ttm = days_between(closed_date, start_date)
-        issues_ttms.append(ttm)
     else:
         ttm = days_between(gmt_now, start_date)
+
+    if ttm > 100:
+        print("wtf")
+
+    issues_ttms.append(ttm)
 
     start_date_text = ''
     if start_date != '':
